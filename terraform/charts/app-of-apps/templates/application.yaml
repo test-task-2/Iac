@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/test-task-2/gitops.git
+    targetRevision: HEAD
+    path: app-of-apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+  # Image Updater writes vote/result/worker tags onto the live Application.
+  # Do not revert those helm.parameters on the next app-of-apps sync.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      name: voting-app
+      jqPathExpressions:
+        - .spec.sources[].helm.parameters
+        - .spec.source.helm.parameters

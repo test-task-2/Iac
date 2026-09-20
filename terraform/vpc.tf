@@ -6,33 +6,32 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, 2)
+  azs     = slice(data.aws_availability_zones.available.names, 0, 2)
+  cluster = var.cluster_name
 }
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 6.7.2"
 
-  name = var.cluster_name
+  name = local.cluster
   cidr = var.vpc_cidr
+  azs  = local.azs
 
-  azs = local.azs
-
-  # Internet-facing ALB + NAT
   public_subnets      = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i)]
-  public_subnet_names = [for az in local.azs : "${var.cluster_name}-alb-${az}"]
+  public_subnet_names = [for az in local.azs : "${local.cluster}-alb-${az}"]
 
-  # EKS nodes and in-cluster workloads (vote, result, worker)
+  intra_subnets      = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i + 40)]
+  intra_subnet_names = [for az in local.azs : "${local.cluster}-control-plane-${az}"]
+
   private_subnets      = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i + 10)]
-  private_subnet_names = [for az in local.azs : "${var.cluster_name}-app-${az}"]
+  private_subnet_names = [for az in local.azs : "${local.cluster}-nodes-${az}"]
 
-  # RDS PostgreSQL
   database_subnets      = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i + 20)]
-  database_subnet_names = [for az in local.azs : "${var.cluster_name}-db-${az}"]
+  database_subnet_names = [for az in local.azs : "${local.cluster}-db-${az}"]
 
-  # ElastiCache Redis
   elasticache_subnets      = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i + 30)]
-  elasticache_subnet_names = [for az in local.azs : "${var.cluster_name}-redis-${az}"]
+  elasticache_subnet_names = [for az in local.azs : "${local.cluster}-redis-${az}"]
 
   enable_nat_gateway   = true
   single_nat_gateway   = true
@@ -41,22 +40,28 @@ module "vpc" {
 
   create_database_subnet_group       = true
   create_database_subnet_route_table = true
-  database_subnet_group_name         = "${var.cluster_name}-db"
+  database_subnet_group_name         = "${local.cluster}-db"
 
   create_elasticache_subnet_group       = true
   create_elasticache_subnet_route_table = true
-  elasticache_subnet_group_name         = "${var.cluster_name}-redis"
+  elasticache_subnet_group_name         = "${local.cluster}-redis"
 
   public_subnet_tags = {
-    Tier                                        = "alb"
-    "kubernetes.io/role/elb"                    = 1
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    Tier                                     = "alb"
+    "kubernetes.io/role/elb"                 = 1
+    "kubernetes.io/cluster/${local.cluster}" = "shared"
+  }
+
+  intra_subnet_tags = {
+    Tier                                     = "control-plane"
+    "kubernetes.io/cluster/${local.cluster}" = "shared"
   }
 
   private_subnet_tags = {
-    Tier                                        = "app"
-    "kubernetes.io/role/internal-elb"           = 1
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    Tier                                     = "nodes"
+    "karpenter.sh/discovery"                 = local.cluster
+    "kubernetes.io/role/internal-elb"        = 1
+    "kubernetes.io/cluster/${local.cluster}" = "shared"
   }
 
   database_subnet_tags = {

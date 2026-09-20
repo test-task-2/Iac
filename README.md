@@ -1,48 +1,40 @@
-# Shared AWS platform
+# Shared AWS platform — network + EKS
 
-Terraform creates a shared VPC and EKS cluster. Crossplane v2 runs on that cluster and provisions app-specific resources (RDS, Redis, ECR, and so on).
+Terraform creates the tagged VPC and an EKS cluster. LBC, Karpenter, and Crossplane should discover subnets and security groups by tags, not hardcoded IDs.
 
-## 1. Deploy EKS
+## Layout
+
+| Pool | Subnets | Route | Discovery tags |
+|---|---|---|---|
+| ALB | `*-alb-*` | public + IGW | `Tier=alb`, `kubernetes.io/role/elb=1`, `kubernetes.io/cluster/<name>=shared` |
+| Control plane | `*-control-plane-*` | isolated (no NAT) | `Tier=control-plane`, `kubernetes.io/cluster/<name>=shared` |
+| Nodes | `*-nodes-*` | private + NAT | `Tier=nodes`, `karpenter.sh/discovery=<name>`, `kubernetes.io/role/internal-elb=1` |
+| Karpenter SG | `${name}-karpenter` | — | `Tier=karpenter`, `karpenter.sh/discovery=<name>`; RDS 5432 and Redis 6379 only from this SG |
+| RDS rotation Lambda SG | `${name}-rds-rotate` | private nodes + NAT | `Tier=rds-rotate`; RDS 5432 also from this SG |
+| DB | `*-db-*` | isolated | `Tier=db`; subnet group `<name>-db` |
+| Redis | `*-redis-*` | isolated | `Tier=redis`; subnet group `<name>-redis` |
+
+EKS API is public (test convenience; restrict CIDRs or use private-only in production). Control plane ENIs sit in isolated subnets. The managed node group `system` (`role=system`) runs Argo CD, LBC, and Karpenter. App pods go on Karpenter Graviton nodes (`role=app`, Free Tier `t4g.small` / `t4g.micro`). Those nodes use IAM role `cool-karpenter-node` (ECR pull) and SG `cool-karpenter` (only path to RDS/Redis).
+
+Defaults: Kubernetes **1.36**, **2** Free Tier `c7i-flex.large` nodes (min = desired = max, no autoscaling), **on-demand**. This account only allows Free Tier instance types: `m7i-flex.large` (largest, 8 GiB, x86), `c7i-flex.large` (4 GiB, x86), `t4g.small` / `t3.small` (2 GiB), `t4g.micro` / `t3.micro` (1 GiB).
+
+CI for [example-voting-app](https://github.com/test-task-2/example-voting-app): three ECR repos (`cool/vote`, `cool/result`, `cool/worker`), Graviton CodeBuild (`linux/arm64` for Karpenter app nodes), and a V2 pipeline from GitHub `main`. The Build stage runs **vote**, **result**, and **worker** in parallel. Push to `main` starts a run once the GitHub connection is Available.
 
 ```bash
 cd terraform
 terraform init
 terraform apply
-# Defaults live in variables.tf (profile kk, us-east-1). State is local (see backend.tf).
-aws eks update-kubeconfig --region us-east-1 --name cool --profile kk
+aws eks update-kubeconfig --region us-east-1 --name cool
 ```
 
-## Terraform resources
+ACM issues `*.test-task.drunk.guru` (and the apex `test-task.drunk.guru`). Terraform creates the DNS validation CNAMEs in Cloudflare zone `drunk.guru` (DNS only, not proxied) and waits until ACM is Issued. Export a token with **Zone.Zone Read** and **Zone.DNS Edit**.
 
-| Layer | Resource |
-|---|---|
-| Network | VPC (`10.42.0.0/16`) |
-| ALB | 2 public subnets (`*-alb-*`), tagged `kubernetes.io/role/elb` |
-| App | 2 private subnets (`*-app-*`) for EKS nodes and pods |
-| DB | 2 isolated subnets + RDS subnet group `cool-db` |
-| Redis | 2 isolated subnets + ElastiCache subnet group `cool-redis` |
-| Network | Internet Gateway, NAT Gateway (app egress only), route tables |
-| EKS | Cluster (`1.36`) |
-| EKS | Self-managed nodes (2× `t3.medium`, AL2023, standard CPU credits) |
-| EKS | Add-ons: `vpc-cni`, `coredns`, `kube-proxy`, `eks-pod-identity-agent` |
-| IAM | `eksClusterRole`, `AmazonEKSNodeRole` |
+```bash
+export CLOUDFLARE_API_TOKEN=...
+```
 
-Nodes run in app subnets. DB and Redis subnets have no NAT. The API endpoint is public so you can reach it from a laptop.
+Terraform creates Secrets Manager `cool/cloudflare` with no value. Put JSON `{"api-token":"..."}` in it by hand. External Secrets syncs that into the cluster; ExternalDNS creates DNS-only CNAMEs for Gateway HTTPRoutes under `test-task.drunk.guru`. The token needs **Zone.DNS Edit** on `drunk.guru`.
 
-## KodeKloud playground limits
+RDS master password is created by RDS (`manageMasterUserPassword`) and stored in Secrets Manager (`rds!db-…`). Crossplane deploys Lambda `cool-postgres-app-rotate` (CloudFormation). That function logs in as the RDS master, creates application user `app` if needed, and rotates its password into `cool/postgres-app`. Apps should use `cool/postgres-app`, not the master secret.
 
-IAM is time-boxed and tightly scoped. This stack works around that:
-
-- `us-east-1` only
-- Cluster role must be `eksClusterRole`, node role must be `AmazonEKSNodeRole` (`iam:PassRole`)
-- No managed node groups (`eks:CreateNodegroup` denied) — self-managed EC2 + ASG instead
-- No `eks:AssociateAccessPolicy` — cannot attach `AmazonEKSClusterAdminPolicy`. Access entry exists without a policy; `kubectl` as `kk` has no admin RBAC
-- EC2: `t2`/`t3` nano–medium only, CPU credits `standard` (unlimited is blocked)
-- EKS 1.36 has no AL2 optimized AMI — nodes use Amazon Linux 2023
-- No extra IAM policies (no KMS cluster encryption — `iam:TagPolicy` denied)
-- Do not remove `default_tags` after the first apply (`iam:UntagRole` / `rds:RemoveTagsFromResource` denied)
-- Local Terraform state only (see `backend.tf`)
-
-## Next
-
-Install Crossplane v2 on this cluster, then compose RDS, ElastiCache, and ECR for the [example-voting-app](https://github.com/dockersamples/example-voting-app).
+ElastiCache Redis is a single-node Graviton `cache.t4g.micro` in subnet group `cool-redis`. Crossplane discovers SG `Tier=redis` and writes host/port to Secrets Manager `cool/redis`.

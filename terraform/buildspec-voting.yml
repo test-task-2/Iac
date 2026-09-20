@@ -1,0 +1,28 @@
+version: 0.2
+
+env:
+  variables:
+    DOCKER_BUILDKIT: "1"
+
+phases:
+  build:
+    commands:
+      - |
+        set -euo pipefail
+        SHORT_SHA="$(echo "${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}" | cut -c1-7)"
+        ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+        REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+        aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"
+        image="${REGISTRY}/${ECR_PREFIX}/${IMAGE_NAME}"
+        created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "Building ${image}:${SHORT_SHA} created=${created}"
+        # BuildKit defaults created to 0001-01-01. Image Updater newest-build
+        # needs a real org.opencontainers.image.created timestamp.
+        docker build --platform linux/arm64 \
+          --label "org.opencontainers.image.created=${created}" \
+          --label "org.opencontainers.image.revision=${SHORT_SHA}" \
+          -t "${image}:${SHORT_SHA}" \
+          -t "${image}:latest" \
+          "${IMAGE_NAME}"
+        docker push "${image}:${SHORT_SHA}"
+        docker push "${image}:latest"

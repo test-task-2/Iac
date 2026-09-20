@@ -1,32 +1,22 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.16"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 6.64.0"
+      version = "~> 6.65"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.25"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 3.0"
+      version = "~> 3.3"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.38"
-    }
-  }
-}
-
-provider "aws" {
-  region  = var.region
-  profile = var.aws_profile
-
-  # Keep these tags. The playground cannot UntagRole / RemoveTagsFromResource,
-  # so dropping default_tags after the first apply fails on existing resources.
-  default_tags {
-    tags = {
-      Project   = var.cluster_name
-      ManagedBy = "terraform"
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.9"
     }
   }
 }

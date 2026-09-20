@@ -1,56 +1,30 @@
-# In-cluster Argo CD. The EKS ARGOCD capability needs IAM Identity Center,
-# which this playground SCP denies (sso:ListInstances).
-
-data "aws_eks_cluster" "this" {
-  name = module.eks.cluster_name
-}
-
-data "aws_eks_cluster_auth" "this" {
-  name = module.eks.cluster_name
-}
-
-provider "helm" {
-  kubernetes = {
-    host                   = data.aws_eks_cluster.this.endpoint
-    cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
-    token                  = data.aws_eks_cluster_auth.this.token
-  }
-}
-
-provider "kubernetes" {
-  host                   = data.aws_eks_cluster.this.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.this.token
-}
-
 resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
-  version          = "10.8.3"
+  version          = "10.9.1"
   namespace        = "argocd"
   create_namespace = true
-  timeout          = 600
   wait             = true
+  timeout          = 600
+  atomic           = true
 
-  # Single replica, ClusterIP — 2× t3.medium has no room for HA or an extra ELB.
-  values = [
-    yamlencode({
-      global = {
-        domain = "argocd.local"
-      }
-      configs = {
-        params = {
-          "server.insecure" = true
-        }
-      }
-      server = {
-        service = {
-          type = "ClusterIP"
-        }
-      }
-    })
+  values = [file("${path.module}/argocd-values.yaml")]
+
+  depends_on = [
+    aws_eks_node_group.default,
+    aws_eks_addon.coredns,
+    aws_eks_addon.vpc_cni,
+    aws_eks_addon.kube_proxy,
+    aws_eks_access_policy_association.root,
   ]
+}
 
-  depends_on = [aws_eks_addon.coredns]
+resource "helm_release" "app_of_apps" {
+  name       = "app-of-apps"
+  chart      = "${path.module}/charts/app-of-apps"
+  namespace  = "argocd"
+  wait       = true
+  timeout    = 180
+  depends_on = [helm_release.argocd]
 }
