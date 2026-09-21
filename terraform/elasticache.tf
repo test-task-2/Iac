@@ -30,9 +30,8 @@ resource "aws_elasticache_replication_group" "redis" {
 }
 
 resource "aws_secretsmanager_secret" "redis" {
-  count                   = var.use_terraform_stack ? 1 : 0
   name                    = local.redis_secret
-  description             = "ElastiCache Redis endpoint for ${local.redis_id}"
+  description             = "ElastiCache Redis endpoint for ${local.redis_id}. Version is written by Terraform when use_terraform_stack=true, otherwise by Crossplane."
   recovery_window_in_days = 0
 
   tags = {
@@ -40,9 +39,14 @@ resource "aws_secretsmanager_secret" "redis" {
   }
 }
 
+moved {
+  from = aws_secretsmanager_secret.redis[0]
+  to   = aws_secretsmanager_secret.redis
+}
+
 resource "aws_secretsmanager_secret_version" "redis" {
   count     = var.use_terraform_stack ? 1 : 0
-  secret_id = aws_secretsmanager_secret.redis[0].id
+  secret_id = aws_secretsmanager_secret.redis.id
   secret_string = jsonencode({
     engine = "redis"
     host   = aws_elasticache_replication_group.redis[0].primary_endpoint_address

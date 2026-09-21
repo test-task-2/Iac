@@ -55,9 +55,8 @@ resource "aws_db_instance" "postgres" {
 }
 
 resource "aws_secretsmanager_secret" "postgres_app" {
-  count                   = var.use_terraform_stack ? 1 : 0
   name                    = local.postgres_app_secret
-  description             = "RDS credentials for ${local.postgres_id}"
+  description             = "RDS credentials for ${local.postgres_id}. Version is written by Terraform when use_terraform_stack=true, otherwise by Crossplane."
   recovery_window_in_days = 0
 
   tags = {
@@ -65,9 +64,14 @@ resource "aws_secretsmanager_secret" "postgres_app" {
   }
 }
 
+moved {
+  from = aws_secretsmanager_secret.postgres_app[0]
+  to   = aws_secretsmanager_secret.postgres_app
+}
+
 resource "aws_secretsmanager_secret_version" "postgres_app" {
   count     = var.use_terraform_stack ? 1 : 0
-  secret_id = aws_secretsmanager_secret.postgres_app[0].id
+  secret_id = aws_secretsmanager_secret.postgres_app.id
 
   secret_string_wo = jsonencode({
     engine          = "postgres"
