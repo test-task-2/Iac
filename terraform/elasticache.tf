@@ -31,7 +31,7 @@ resource "aws_elasticache_replication_group" "redis" {
 
 resource "aws_secretsmanager_secret" "redis" {
   name                    = local.redis_secret
-  description             = "ElastiCache Redis endpoint for ${local.redis_id}. Version is written by Terraform when use_terraform_stack=true, otherwise by Crossplane."
+  description             = "ElastiCache Redis endpoint for ${local.redis_id}. Version is written by Terraform when use_terraform_stack=true."
   recovery_window_in_days = 0
 
   tags = {

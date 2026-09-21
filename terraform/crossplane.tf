@@ -18,11 +18,6 @@ resource "aws_iam_role_policy_attachment" "crossplane_ec2" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "crossplane_sm" {
-  role       = aws_iam_role.crossplane.name
-  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
-}
-
 resource "aws_eks_pod_identity_association" "crossplane" {
   cluster_name    = module.eks.cluster_name
   namespace       = "crossplane-system"

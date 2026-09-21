@@ -17,7 +17,7 @@ variable "cluster_name" {
 }
 
 variable "use_terraform_stack" {
-  description = "When true, RDS Postgres and ElastiCache Redis are created by Terraform (and secret versions are written). When false, leave instances to Crossplane; Secrets Manager cool/postgres-app and cool/redis still exist."
+  description = "When true, RDS Postgres and ElastiCache Redis are created by Terraform (and secret versions are written). When false, leave instances to Crossplane."
   type        = bool
   default     = false
 }

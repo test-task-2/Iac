@@ -56,7 +56,7 @@ resource "aws_db_instance" "postgres" {
 
 resource "aws_secretsmanager_secret" "postgres_app" {
   name                    = local.postgres_app_secret
-  description             = "RDS credentials for ${local.postgres_id}. Version is written by Terraform when use_terraform_stack=true, otherwise by Crossplane."
+  description             = "RDS credentials for ${local.postgres_id}. Version is written by Terraform when use_terraform_stack=true."
   recovery_window_in_days = 0
 
   tags = {
