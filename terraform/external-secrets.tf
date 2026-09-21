@@ -32,7 +32,7 @@ resource "aws_iam_role_policy" "external_secrets" {
 }
 
 resource "aws_eks_pod_identity_association" "external_secrets" {
-  cluster_name    = aws_eks_cluster.this.name
+  cluster_name    = module.eks.cluster_name
   namespace       = "external-secrets"
   service_account = "external-secrets"
   role_arn        = aws_iam_role.external_secrets.arn

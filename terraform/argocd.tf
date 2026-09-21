@@ -11,13 +11,7 @@ resource "helm_release" "argocd" {
 
   values = [file("${path.module}/argocd-values.yaml")]
 
-  depends_on = [
-    aws_eks_node_group.default,
-    aws_eks_addon.coredns,
-    aws_eks_addon.vpc_cni,
-    aws_eks_addon.kube_proxy,
-    aws_eks_access_policy_association.root,
-  ]
+  depends_on = [module.eks]
 }
 
 resource "helm_release" "app_of_apps" {

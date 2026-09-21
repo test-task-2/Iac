@@ -1,7 +1,5 @@
-# Prefer manage_master_user_password (RDS writes the master secret) and a
-# separate app secret rotated by Lambda. This stack instead generates an
-# ephemeral random password and write-only-sets it on RDS and Secrets Manager
-# so the value never lands in Terraform state.
+# Generated password is write-only-set on RDS and Secrets Manager so the
+# value never lands in Terraform state. No rotation.
 locals {
   postgres_id                  = "${local.cluster}-postgres"
   postgres_app_secret          = "${local.cluster}/postgres-app"

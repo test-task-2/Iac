@@ -1,5 +1,5 @@
 resource "aws_ec2_tag" "cluster_sg_karpenter" {
-  resource_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+  resource_id = module.eks.cluster_primary_security_group_id
   key         = "karpenter.sh/discovery"
   value       = local.cluster
 }
@@ -43,12 +43,6 @@ resource "aws_iam_role_policy_attachment" "karpenter_node_ssm" {
 resource "aws_iam_instance_profile" "karpenter_node" {
   name = aws_iam_role.karpenter_node.name
   role = aws_iam_role.karpenter_node.name
-}
-
-resource "aws_eks_access_entry" "karpenter_node" {
-  cluster_name  = aws_eks_cluster.this.name
-  principal_arn = aws_iam_role.karpenter_node.arn
-  type          = "EC2_LINUX"
 }
 
 data "aws_iam_policy_document" "karpenter_controller_assume" {
@@ -131,7 +125,7 @@ data "aws_iam_policy_document" "karpenter_controller" {
   statement {
     sid       = "EKS"
     actions   = ["eks:DescribeCluster"]
-    resources = [aws_eks_cluster.this.arn]
+    resources = [module.eks.cluster_arn]
   }
 
   statement {
@@ -148,7 +142,7 @@ resource "aws_iam_role_policy" "karpenter_controller" {
 }
 
 resource "aws_eks_pod_identity_association" "karpenter" {
-  cluster_name    = aws_eks_cluster.this.name
+  cluster_name    = module.eks.cluster_name
   namespace       = "karpenter"
   service_account = "karpenter"
   role_arn        = aws_iam_role.karpenter_controller.arn

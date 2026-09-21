@@ -10,7 +10,7 @@ resource "aws_iam_role_policy_attachment" "image_updater_ecr" {
 }
 
 resource "aws_eks_pod_identity_association" "image_updater" {
-  cluster_name    = aws_eks_cluster.this.name
+  cluster_name    = module.eks.cluster_name
   namespace       = "argocd"
   service_account = "argocd-image-updater"
   role_arn        = aws_iam_role.image_updater.arn

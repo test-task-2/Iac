@@ -35,7 +35,7 @@ variable "kubernetes_version" {
 }
 
 variable "node_instance_type" {
-  description = "Managed node instance type. Must be Free Tier eligible on this account."
+  description = "Managed node instance type for the system node group."
   type        = string
   default     = "c7i-flex.large"
 }
@@ -47,7 +47,7 @@ variable "node_ami_type" {
 }
 
 variable "node_capacity_type" {
-  description = "ON_DEMAND is required for Free Tier eligible types on this plan. SPOT is not free-plan eligible."
+  description = "EKS managed node capacity type: ON_DEMAND or SPOT."
   type        = string
   default     = "ON_DEMAND"
 }
@@ -55,7 +55,7 @@ variable "node_capacity_type" {
 variable "node_count" {
   description = "Fixed managed node count (min = desired = max; no autoscaling)."
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "github_owner" {

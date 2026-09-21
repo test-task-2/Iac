@@ -71,7 +71,7 @@ resource "aws_iam_role_policy" "grafana" {
 }
 
 resource "aws_eks_pod_identity_association" "grafana" {
-  cluster_name    = aws_eks_cluster.this.name
+  cluster_name    = module.eks.cluster_name
   namespace       = "monitoring"
   service_account = "grafana"
   role_arn        = aws_iam_role.grafana.arn
