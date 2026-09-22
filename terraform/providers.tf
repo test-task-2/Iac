@@ -14,6 +14,10 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
+provider "github" {
+  owner = var.github_owner
+}
+
 provider "helm" {
   kubernetes = {
     host                   = module.eks.cluster_endpoint

@@ -76,6 +76,12 @@ variable "github_branch" {
   default     = "main"
 }
 
+variable "github_gitops_repo" {
+  description = "GitOps repository that receives terraform-values.yaml."
+  type        = string
+  default     = "gitops"
+}
+
 variable "acm_domain_name" {
   description = "ACM wildcard domain. DNS validation CNAMEs are created in Cloudflare."
   type        = string
