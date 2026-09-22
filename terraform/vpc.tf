@@ -38,11 +38,11 @@ module "vpc" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  create_database_subnet_group       = true
+  create_database_subnet_group       = var.use_terraform_stack
   create_database_subnet_route_table = true
   database_subnet_group_name         = "${local.cluster}-db"
 
-  create_elasticache_subnet_group       = true
+  create_elasticache_subnet_group       = var.use_terraform_stack
   create_elasticache_subnet_route_table = true
   elasticache_subnet_group_name         = "${local.cluster}-redis"
 

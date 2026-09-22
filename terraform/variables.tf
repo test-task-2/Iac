@@ -17,7 +17,7 @@ variable "cluster_name" {
 }
 
 variable "use_terraform_stack" {
-  description = "When true, RDS Postgres and ElastiCache Redis are created by Terraform (and secret versions are written). When false, leave instances to Crossplane."
+  description = "When true, Terraform creates the RDS subnet group cool-db, RDS Postgres, the ElastiCache subnet group cool-redis, and ElastiCache Redis. When false, Crossplane creates those subnet groups, the RDS instance, and the Redis replication group. Secret values are written either way."
   type        = bool
   default     = false
 }

@@ -56,7 +56,7 @@ resource "aws_db_instance" "postgres" {
 
 resource "aws_secretsmanager_secret" "postgres_app" {
   name                    = local.postgres_app_secret
-  description             = "RDS credentials for ${local.postgres_id}. Version is written by Terraform when use_terraform_stack=true."
+  description             = "RDS credentials for ${local.postgres_id}."
   recovery_window_in_days = 0
 
   tags = {
@@ -70,17 +70,17 @@ moved {
 }
 
 resource "aws_secretsmanager_secret_version" "postgres_app" {
-  count     = var.use_terraform_stack ? 1 : 0
   secret_id = aws_secretsmanager_secret.postgres_app.id
 
   secret_string_wo = jsonencode({
     engine          = "postgres"
-    host            = aws_db_instance.postgres[0].address
-    port            = tostring(aws_db_instance.postgres[0].port)
-    dbname          = aws_db_instance.postgres[0].db_name
+    host            = try(aws_db_instance.postgres[0].address, "")
+    port            = try(tostring(aws_db_instance.postgres[0].port), "5432")
+    dbname          = try(aws_db_instance.postgres[0].db_name, "app")
     username        = local.postgres_username
     password        = ephemeral.random_password.postgres.result
     "root-password" = ephemeral.random_password.postgres.result
   })
-  secret_string_wo_version = local.postgres_password_wo_version
+  # Bump when the instance appears so the stored password matches RDS.
+  secret_string_wo_version = local.postgres_password_wo_version + (var.use_terraform_stack ? 1 : 0)
 }
